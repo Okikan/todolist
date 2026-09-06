@@ -1,0 +1,11 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "todolist",
+  "outputfilename": "todolist",
+  "frontend:install": "",
+  "frontend:build": "",
+  "author": {
+    "name": "",
+    "email": ""
+  }
+}

@@ -1,0 +1,12 @@
+# 构建产物
+build/bin/
+*.exe
+
+# 个人数据：任务数据库，切勿上传
+*.db
+release/
+
+# 依赖与系统文件
+node_modules/
+Thumbs.db
+.DS_Store
