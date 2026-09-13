@@ -28,12 +28,14 @@ func (a *App) onTrayReady() {
 		for {
 			select {
 			case <-mToggle.ClickedCh:
-				a.toggleWindow()
+				go a.toggleWindow() // 异步派发：即使某次调用变慢也绝不阻塞菜单循环
 			case <-mNew.ClickedCh:
-				a.showWindow()
-				if a.ctx != nil {
-					runtime.EventsEmit(a.ctx, "open-new-task")
-				}
+				go func() {
+					a.showWindow()
+					if a.ctx != nil {
+						runtime.EventsEmit(a.ctx, "open-new-task")
+					}
+				}()
 			case <-mQuit.ClickedCh:
 				a.quitApp()
 				return

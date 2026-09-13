@@ -51,38 +51,54 @@ func (a *App) onSecondInstanceLaunch(data options.SecondInstanceData) {
 	a.showWindow()
 }
 
-// showWindow 显示主窗口
+// showWindow 显示主窗口（Win32 异步调用，托盘长时间静置后也能立即唤回）
 func (a *App) showWindow() {
-	if a.ctx == nil {
+	a.hidden = false
+	if hwnd := findMainWindow(); hwnd != 0 {
+		if winMinimised(hwnd) {
+			winShowAsync(hwnd, swRestore)
+		} else {
+			winShowAsync(hwnd, swShow)
+		}
+		winForeground(hwnd)
 		return
 	}
-	a.hidden = false
-	runtime.WindowShow(a.ctx)
+	// 兜底：找不到句柄时退回 Wails 运行时
+	if a.ctx != nil {
+		runtime.WindowShow(a.ctx)
+	}
 }
 
 // hideWindow 隐藏主窗口
 func (a *App) hideWindow() {
-	if a.ctx == nil {
+	a.hidden = true
+	if hwnd := findMainWindow(); hwnd != 0 {
+		winShowAsync(hwnd, swHide)
 		return
 	}
-	a.hidden = true
-	runtime.WindowHide(a.ctx)
+	if a.ctx != nil {
+		runtime.WindowHide(a.ctx)
+	}
 }
 
-// toggleWindow 显示/隐藏主窗口（托盘菜单与全局快捷键共用）
+// toggleWindow 显示/隐藏主窗口（托盘菜单与全局快捷键共用）。
+// 直接读窗口真实状态（可见/最小化）判断，不经 Wails 同步 RPC，永不阻塞。
 func (a *App) toggleWindow() {
-	if a.ctx == nil {
+	hwnd := findMainWindow()
+	if hwnd == 0 {
+		// 找不到窗口句柄（理论不会发生），退回 Wails 运行时
+		if a.hidden {
+			a.showWindow()
+		} else if a.ctx != nil {
+			a.hideWindow()
+		}
 		return
 	}
-	if a.hidden {
+	if !winVisible(hwnd) || winMinimised(hwnd) {
 		a.showWindow()
-		return
+	} else {
+		a.hideWindow()
 	}
-	if runtime.WindowIsMinimised(a.ctx) {
-		runtime.WindowUnminimise(a.ctx)
-		return
-	}
-	a.hideWindow()
 }
 
 // ---- 绑定给前端的方法 ----
