@@ -62,7 +62,9 @@ type Store struct {
 func NewStore() (*Store, error) {
 	dir := executableDir()
 	dbPath := filepath.Join(dir, "todolist.db")
-	db, err := sql.Open("sqlite", dbPath)
+	// busy_timeout：万一发生锁竞争，最多等 5 秒就报错返回，而不是无限卡死
+	dsn := "file:" + strings.ReplaceAll(filepath.ToSlash(dbPath), " ", "%20") + "?_pragma=busy_timeout(5000)"
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
@@ -512,6 +514,12 @@ func (s *Store) GetTrash() ([]TrashItem, error) {
 
 // RestoreFromTrash 从回收站恢复任务（追加到对应分组末尾）
 func (s *Store) RestoreFromTrash(id int64) error {
+	// maxPosition 必须在开启事务前查询：连接池为单连接（SetMaxOpenConns(1)），
+	// 事务内再用 s.db 查询会永远等不到连接，造成整个数据库死锁
+	pos, err := s.maxPosition()
+	if err != nil {
+		return err
+	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -524,10 +532,6 @@ func (s *Store) RestoreFromTrash(id int64) error {
 	err = tx.QueryRow(
 		`SELECT title, done, created_at, completed_at, due_at, urge_days, note, tag FROM trash WHERE id = ?`, id,
 	).Scan(&it.Title, &done, &it.CreatedAt, &completedAt, &dueAt, &it.UrgeDays, &note, &tag)
-	if err != nil {
-		return err
-	}
-	pos, err := s.maxPosition()
 	if err != nil {
 		return err
 	}

@@ -30,6 +30,16 @@ function showError(msg) {
   if (el) el.textContent = '⚠ ' + msg;
 }
 
+// 给后端调用加超时保护：数据库万一被锁死，界面报错而不是永久假死
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise(function (_, reject) {
+      setTimeout(function () { reject(new Error((label || '操作') + '超时，请重试')); }, ms);
+    })
+  ]);
+}
+
 window.onerror = function (msg, src, line) {
   showError('JS错误: ' + msg + ' (行' + line + ')');
   return false;
@@ -65,7 +75,7 @@ async function refresh() {
   refreshing = true;
   try {
     try {
-      const todos = await api.GetTodos();
+      const todos = await withTimeout(api.GetTodos(), 20000, '读取任务');
       lastActive = todos.filter(t => !t.done);
       lastDone = todos.filter(t => t.done);
       renderAll();
